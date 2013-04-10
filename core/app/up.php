@@ -11,22 +11,22 @@
  * @ingroup migrations
  */
 // This adds a table to the schema, The Schemer builds up a schema with all of the migrations that are to be run, and then updates the db
-$this->table("users",
+$this->table("users  label_select:CONCAT(first_name, ' ', last_name, ' (', email, ')')",
 	"first_name  type:string  length:64  list:true",
 	"last_name  type:string  length:64  list:true",
-	"username  type:string  length:128  unique:  list:true",
 	"email  type:string  length:128  unique:  list:true",
 	"password  type:password  confirm:password_confirm  optional_update:",
-	"memberships  type:int",
+	"memberships  type:int  list:true",
 	"address  type:string  length:128",
 	"address2  type:string  length:128  default:",
 	"city  type:string  length:32",
 	"state  type:string  length:32",
 	"country  type:string  length:64",
-	"zip  type:string  length:16"
+	"zip  type:string  length:16",
+	"last_visit  type:datetime  default:0000-00-00 00:00:00  list:true  display:false"
 );
 //This will be stored immediately after the creation of the users table
-$this->store("users", "username:root", "memberships:1");
+$this->store("users", "email:root", "memberships:1");
 $this->table("permits  list:all",
 	"role  type:string  length:30",
 	"who  type:int  default:0",
@@ -36,12 +36,13 @@ $this->table("permits  list:all",
 	"related_id  type:int  default:0"
 );
 $this->table("terms",
-	"term  type:string  length:128",
+	"term  type:string  length:128  slug:slug",
 	"slug  type:string  length:128  unique:taxonomy parent  display:false",
 	"description  type:string  length:255  input_type:textarea  default:",
 	"taxonomy  type:string  views:taxonomies  input_type:hidden",
-	"parent  type:int  default:0  input_type:category_select  readonly:",
-	"position  type:int  ordered:taxonomy parent  display:false"
+	"parent  type:int  default:0  input_type:category_select  readonly:  materialized_path:term_path",
+	"position  type:int  ordered:taxonomy parent  display:false",
+	"term_path  type:string  length:255  display:false"
 );
 $this->table("settings",
 	"name  type:string  length:255",
@@ -50,11 +51,10 @@ $this->table("settings",
 	"options  type:text  default:",
 	"value  type:text  default:",
 	"description  type:text  default:",
-	"category  type:category  null:"
+	"category  type:category  null:",
+	"autoload  type:bool  default:0"
 );
-$this->store("settings", "name:meta", "type:textarea  label:Custom Analytics, etc..");
-$this->store("settings", "name:seo_hide", "type:checkbox  value:1  label:Hide from search engines");
-$this->table("uris  label:Pages  singular_label:Page",
+$this->table("uris  label:Pages  singular_label:Page  label_select:title",
 	"title  type:string  length:128  list:true",
 	"path  type:string  length:64  unique:  list:true",
 	"template  type:string  length:64  default:  list:false",
@@ -80,19 +80,22 @@ $this->table("blocks  list:all",
 	"content  type:text  default:",
 	"position  type:int  ordered:uris_id"
 );
-$this->table("menus  list:all",
-	"name  type:string  length:32"
-);
-$this->table("uris_menus  list:all",
-	"uris_id  type:int  references:uris id  update:cascade  delete:cascade",
-	"menus_id  type:int  references:menus id  update:cascade  delete:cascade",
-	"position  type:int  ordered:menus_id parent",
-	"parent  type:int  default:0"
+$this->table("menus",
+	"menu  type:string  length:32  list:true  display:false",
+	"parent  type:int  default:0  materialized_path:menu_path  references:menus id  constraint:false",
+	"uris_id  type:int  references:uris id  label:Page  null:  update:cascade  delete:cascade",
+	"href  type:string  length:255  label:URL  default:",
+	"content  type:string  length:255  default:",
+	"target  type:string  default:",
+	"template  type:string  length:128  default:",
+	"position  type:int  ordered:menu parent",
+	"menu_path  type:string  length:255  display:false"
 );
 // URIS
 $this->uri("sb-admin", "format:xhr  title:Bridge  prefix:core/app/views/  groups:root");
 $this->uri("api", "template:api  prefix:core/app/views/  type:Page");
 $this->uri("documentation", "template:documentation  prefix:core/app/views/  type:Page  groups:root");
+$this->uri("profile", "template:controller");
 //Rogue IDE
 $this->uri("rogue", "title:Rogue IDE  format:xhr  prefix:core/app/views/  groups:root");
 //Admin
@@ -102,32 +105,47 @@ $this->uri("upload", "prefix:core/app/views/  format:xhr  groups:root");
 $this->uri("terms", "prefix:core/app/views/  format:xhr  groups:user");
 $this->uri("robots", "prefix:core/app/views/  format:txt");
 
-// PERMITS
-//STANDARD WRITE PERMITS
-foreach(array("users", "terms", "menus", "uris_menus", "uris", "options") as $standard_write) {
-	$this->permit("$standard_write::create", "admin:");
-	$this->permit("$standard_write::delete", "admin:global");
-}
-//STANDARD READ PERMITS
-foreach (array("terms", "menus", "uris_menus") as $standard_read) {
-	$this->permit("$standard_read::read","user:global");
-}
-// URI PERMITS
-$this->permit("uris::read", "collective:global 4");
-$this->permit("uris::update", "admin:global");
-$this->permit("uris::apply_tags", "admin:global");
-$this->permit("uris::remove_tag", "admin:global");
-// USER PERMITS
-$this->permit("users::login", "everyone:table");
-$this->permit("users::logout", "everyone:table");
-$this->permit("users::create", "admin:");
-$this->permit("users::register", "everyone:table");
-$this->permit("users::update_profile", "owner:global");
-$this->permit("users::reset_password", "everyone:table");
-// MENU PERMITS
-$this->permit("menus::add_uri", "admin:global");
-// TERM PERMITS
-$this->permit("terms::delete_taxonomy", "admin:table");
+//Admin Menu
+$this->menu("admin",
+	array(
+		"content" => '<span class="icon-reorder"></span>',
+		"children" => array(
+			"href:admin/settings  content:Settings",
+			"template:divider",
+			"href:admin/menus  content:Menus",
+			"href:admin/taxonomies  content:Taxonomy",
+			"template:divider  collective:1",
+			"href:sb-admin  content:The Bridge  target:_blank"
+		)
+	),
+	"href:admin/users  content:Users",
+	"href:admin/uris  content:Pages"
+);
+
+//uris categories
+$this->taxonomy("uris_categories",
+	"term:Uncategorized"
+);
+//uris tags
+$this->taxonomy("uris_tags",
+	"term:Uncategorized"
+);
+//settings categories
+$this->taxonomy("settings_category",
+	"term:General",
+	"term:SEO",
+	"term:Themes"
+);
+
+//general settings
+$this->store("settings", "name:site_name", "category:settings_category general  type:text  label:Site Name  autoload:1  value:Starbug");
+$this->store("settings", "name:tagline", "category:settings_category general  type:text  label:Tagline  autoload:1  value:Fresh XHTML and CSS, just like mom used to serve!");
+$this->store("settings", "name:default_path", "category:settings_category general  type:text  label:Default Path  autoload:1  value:home");
+//seo settings
+$this->store("settings", "name:meta",  "category:settings_category seo  type:textarea  label:Custom Analytics, etc..  autoload:1");
+$this->store("settings", "name:seo_hide",  "category:settings_category seo  type:checkbox  value:1  label:Hide from search engines  autoload:1");
+//theme settings
+$this->store("settings", "name:theme",  "category:settings_category themes  type:text  label:Theme  autoload:1  value:starbug-1");
 
 //LOGGING TABLES
 //ERROR LOG
@@ -147,7 +165,7 @@ if (Etc::ENABLE_SQL_LOG) {
 		"old_value  type:text",
 		"new_value  type:text"
 	);
-	foreach (array("users", "permits", "uris", "tags", "uris_tags", "leafs", "text_leaf", "files", "options", "emails", "errors") as $tbl) {
+	foreach ($this->tables as $tbl => $columns) {
 		$this->after("$tbl::insert", $this->get_logging_trigger("$tbl", "insert"));
 		$this->after("$tbl::update", $this->get_logging_trigger("$tbl", "update"));
 		$this->after("$tbl::delete", $this->get_logging_trigger("$tbl", "delete"));

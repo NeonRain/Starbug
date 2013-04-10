@@ -1,8 +1,7 @@
 define([
-	"dojo",
-	"dojo/store/util/QueryResults"
-], function(dojo, QueryResults) {
-return dojo.declare("starbug.store.Api", null, {
+	"dojo", "dojo/_base/declare", "dojo/_base/lang", "dojo/store/util/QueryResults"
+], function(dojo, declare, lang, QueryResults) {
+return declare(null, {
 	// query: String
 	//		The API query string
 	apiQuery: "",
@@ -10,9 +9,10 @@ return dojo.declare("starbug.store.Api", null, {
 	//		Indicates the property to use as the identity property. The values of this
 	//		property should be unique.
 	model: '',
-	action:'list',
+	action:'admin',
 	post_action: 'create',
 	idProperty: "id",
+	last_query:'',
 	params:{},
 	constructor: function(/*starbug.store.Api*/ options){
 		// summary:
@@ -20,7 +20,7 @@ return dojo.declare("starbug.store.Api", null, {
 		//		formatted data.
 		// options:
 		//		This provides any configuration information that will be mixed into the store
-		dojo.mixin(this, options);
+		lang.mixin(this, options);
 	},
 	get: function(id, options){
 		//	summary:
@@ -39,7 +39,7 @@ return dojo.declare("starbug.store.Api", null, {
 		var headers = options || {};
 		headers.Accept = "application/javascript, application/json";
 		return dojo.xhrGet({
-			url: WEBSITE_URL+'api/'+this.models+'/get.json'+(q || ''),
+			url: WEBSITE_URL+'api/'+this.model+'/get.json'+(q || ''),
 			handleAs: "json",
 			headers: headers
 		});
@@ -125,8 +125,10 @@ return dojo.declare("starbug.store.Api", null, {
 				query += (i > 0 ? "," : "") + encodeURIComponent(sort.attribute+' '+(sort.descending ? 'DESC' : 'ASC'));
 			}
 		}
+		var query_url = WEBSITE_URL+'api/'+this.model+'/'+this.action+'.json' + (query || "");
+		this.last_query = query_url;
 		var results = dojo.xhrGet({
-			url: WEBSITE_URL+'api/'+this.model+'/'+this.action+'.json' + (query || ""),
+			url: query_url,
 			handleAs: "json",
 			headers: headers
 		});

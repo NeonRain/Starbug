@@ -62,6 +62,7 @@ class Table {
 		$this->imported = array();
 		$this->imported_functions = array();
 		$this->init();
+		if (!isset($this->statuses)) $this->statuses = config("statuses");
 	}
 
 	protected function init() {
@@ -101,15 +102,36 @@ class Table {
 		$this->relations[$name] = array_merge_recursive($this->relations[$name], $merge);
 	}
 
-
-	protected function store($arr, $from="auto") {
-		$this->db->store($this->type, $arr, $from);
+	/**
+	 * store a record to the db
+	 * @see db::store
+	 */
+	protected function store($record, $from="auto") {
+		$this->db->store($this->type, $record, $from);
 	}
 
+	/**
+	 * remove a record from the db
+	 * @see db::remove
+	 */
 	protected function remove($where) {
 		return $this->db->remove($this->type, $where);
 	}
 
+	/**
+	 * get records from the db
+	 * @see db::get
+	 */
+	function get() {
+		$args = func_get_args();
+		array_unshift($args, $this->type);
+		return call_user_func_array(array($this->db, "get"), $args);
+	}
+
+	/**
+	 * get records from the db
+	 * @see db::query
+	 */
 	function query($args="", $froms="", $replacements=array()) {
 		if (is_array($froms)) {
 			$replacements = $froms;
@@ -120,29 +142,15 @@ class Table {
 		return $records;
 	}
 
-	function id_list($top, $role) {
-		$prefix = array($top);
-		$children = $this->query("where:$role=$top");
-		if (!empty($children)) foreach($children as $kid) $prefix = array_merge($prefix, $this->id_list($kid['id'], $role));
-		return $prefix;
-	}
-
-	function grant() {
-		global $sb;
-		$_POST[$this->type]['status'] = array_sum($_POST['status']);
-		$sb->grant($this->type, $_POST[$this->type]);
-	}
-
 	function filter($data) {
 		return $data;
 	}
 
-	function json($args="", $froms="", $deep="auto") {
-		header("Content-Type: application/json");
-		$data = $this->query($args, $froms, $deep);
-		$json = '[';
-		foreach($data as $row) $json .= ApiFunctions::rowToJSON($row).", ";
-		return rtrim($json, ", ")."]";
+	function query_statuses($query) {
+		$statuses = array();
+		foreach ($this->statuses as $label => $id) $statuses[] = array("id" => $id, "label" => $label);
+		$query['data'] = $statuses;
+		return $query;
 	}
 
 	protected function mixin($object) {
